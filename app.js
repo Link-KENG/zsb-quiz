@@ -45,7 +45,7 @@
       else judges.push(i);
     });
     shuffleArr(singles); shuffleArr(multis); shuffleArr(judges);
-    return shuffleArr(singles.slice(0, 50).concat(multis.slice(0, 30), judges.slice(0, 20)));
+    return shuffleArr(singles.slice(0, 60).concat(multis.slice(0, 20), judges.slice(0, 20)));
   }
   function newState(mode, paper) {
     return {
