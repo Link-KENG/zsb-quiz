@@ -14,6 +14,7 @@
   var TYPE_CLS = { single: 'single', multi: 'multi', judge: 'judge' };
   var KEY_FULL = 'zsb500_full_v2';
   var KEY_MOCK = 'zsb500_mock_v2';
+  var KEY_HISTORY = 'zsb500_history_v1';
 
   function decode(ans64) {
     var bin = atob(ans64);
@@ -76,6 +77,36 @@
     try { localStorage.removeItem(KEY_FULL); localStorage.removeItem(KEY_MOCK); } catch (e) {}
   }
 
+  /* ---------- 历史记录 ---------- */
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(KEY_HISTORY)) || []; } catch (e) { return []; }
+  }
+  function saveHistory(list) {
+    try { localStorage.setItem(KEY_HISTORY, JSON.stringify(list)); } catch (e) {}
+  }
+  function clearHistory() {
+    try { localStorage.removeItem(KEY_HISTORY); } catch (e) {}
+  }
+  function addRecord() {
+    var r = compute();
+    var rec = {
+      ts: Date.now(), name: state.name, mode: state.mode,
+      paper: state.mode === 'full' ? null : state.paper,
+      answers: state.answers, locked: state.locked,
+      score: r.right, total: r.total,
+      secs: Math.round((Date.now() - state.startAt) / 1000)
+    };
+    var list = loadHistory();
+    list.unshift(rec);
+    if (list.length > 30) list.length = 30;
+    saveHistory(list);
+  }
+  function fmtDate(ts) {
+    var d = new Date(ts);
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
   /* ---------- 判分 ---------- */
   function isCorrect(q, u) {
     if (u == null) return false;
@@ -114,6 +145,41 @@
     $('nameInput').value = state ? state.name : '';
     var savedMock = loadKey(KEY_MOCK);
     $('resumeMockBtn').classList.toggle('hidden', !(savedMock && !savedMock.submitted));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    var list = loadHistory();
+    var box = $('historyBox');
+    if (!list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.classList.remove('hidden');
+    var html = '<div class="historyTitle">历史答题记录（共 ' + list.length + ' 次）<button id="clearHistoryBtn">清空记录</button></div>';
+    list.forEach(function (rec, i) {
+      var modeLabel = rec.mode === 'mock' ? '随机模拟卷' : '完整训练';
+      html += '<div class="historyItem" data-i="' + i + '">' +
+        '<span class="hNo">#' + (i + 1) + '</span>' +
+        '<span class="hMain">' + (rec.name || '匿名') + ' · ' + modeLabel +
+        ' <b>' + rec.score + ' / ' + rec.total + '</b> 分 · ' + rec.secs + ' 秒</span>' +
+        '<span class="hTime">' + fmtDate(rec.ts) + '</span></div>';
+    });
+    box.innerHTML = html;
+    box.querySelectorAll('.historyItem').forEach(function (el) {
+      el.onclick = function () { viewRecord(list[Number(el.dataset.i)]); };
+    });
+    $('clearHistoryBtn').onclick = function () {
+      if (confirm('确定清空全部历史记录吗？')) { clearHistory(); renderHistory(); }
+    };
+  }
+
+  function viewRecord(rec) {
+    state = {
+      name: rec.name, mode: rec.mode,
+      paper: rec.paper || FLAT.map(function (_, i) { return i; }),
+      answers: rec.answers, locked: rec.locked,
+      startAt: 0, submitted: true, idx: 0,
+      secsOverride: rec.secs, ts: rec.ts, historyView: true
+    };
+    showResult();
   }
 
   /* ---------- 答题页 ---------- */
@@ -282,6 +348,7 @@
     var unanswered = state.locked.filter(function (l) { return !l; }).length;
     if (unanswered > 0 && !confirm('还有 ' + unanswered + ' 题未作答，确定交卷吗？')) return;
     state.submitted = true;
+    addRecord();
     save();
     clearInterval(timerInt);
     showResult();
@@ -295,8 +362,7 @@
     $('exam').classList.add('hidden');
     $('result').classList.remove('hidden');
     var r = compute();
-    var ms = Date.now() - state.startAt;
-    var secs = Math.round(ms / 1000);
+    var secs = state.historyView ? state.secsOverride : Math.round((Date.now() - state.startAt) / 1000);
     var pt = r.perType;
     var isMock = state.mode === 'mock';
     var extra = isMock
@@ -314,9 +380,9 @@
           return rows;
         })();
     $('resultBox').innerHTML =
-      '<h2>' + (isMock ? '随机模拟卷 · ' : '完整训练 · ') + (state.name ? state.name + ' · ' : '') + '答题成绩</h2>' +
+      '<h2>' + (state.historyView ? fmtDate(state.ts) + ' · ' : '') + (isMock ? '随机模拟卷 · ' : '完整训练 · ') + (state.name ? state.name + ' · ' : '') + '答题成绩</h2>' +
       '<div class="bigscore">' + r.right + '<small> / ' + r.total + ' 分</small></div>' +
-      '<div style="color:#888;font-size:14px;margin-top:8px;">答题用时：<b style="color:#1a3c6e;">' + secs + '</b> 秒（' + fmtTime(ms) + '）· 未作答 ' + r.unanswered + ' 题</div>' +
+      '<div style="color:#888;font-size:14px;margin-top:8px;">答题用时：<b style="color:#1a3c6e;">' + secs + '</b> 秒（' + fmtTime(secs * 1000) + '）· 未作答 ' + r.unanswered + ' 题</div>' +
       '<div class="statrow">' + extra + '</div>';
     $('filters').innerHTML =
       '<button data-f="wrong" class="' + (reviewFilter === 'wrong' ? 'active' : '') + '">只看错题 / 未答</button>' +
@@ -324,7 +390,7 @@
     $('filters').querySelectorAll('button').forEach(function (btn) {
       btn.onclick = function () { reviewFilter = btn.dataset.f; renderReview(); };
     });
-    $('newMockBtn').classList.toggle('hidden', !isMock);
+    $('redoExamBtn').classList.toggle('hidden', state.historyView);
     $('redoBtn').textContent = '返回首页';
     renderReview();
   }
@@ -406,9 +472,9 @@
     renderTabs(); renderInfo(); renderCard(); renderGrid(); save();
   };
   $('submitBtn').onclick = submit;
-  $('newMockBtn').onclick = function () {
+  $('redoExamBtn').onclick = function () {
     var name = state.name;
-    state = newState('mock', genMockPaper());
+    state = state.mode === 'mock' ? newState('mock', genMockPaper()) : newState('full', FLAT.map(function (_, i) { return i; }));
     state.name = name;
     save();
     showExam();

@@ -27,7 +27,18 @@ button { cursor: pointer; font-family: inherit; }
 .modebtn.mock { background: #c77700; }
 .modebtn.mock:hover { background: #a86600; }
 .modebtn.resume { background: #fff; color: #1a3c6e; border: 1.5px dashed #1a3c6e; }
-#newMockBtn { display: block; margin: 16px auto 6px; padding: 12px 40px; background: #c77700; color: #fff; border: none; border-radius: 8px; font-size: 16px; }
+#redoExamBtn { display: block; margin: 16px auto 6px; padding: 12px 40px; background: #c77700; color: #fff; border: none; border-radius: 8px; font-size: 16px; }
+#redoExamBtn:hover { background: #a86600; }
+.history { margin-top: 16px; background: #fff; border-radius: 12px; padding: 14px 16px; text-align: left; }
+.historyTitle { font-size: 15px; font-weight: bold; color: #1a3c6e; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.historyTitle button { font-size: 12px; padding: 4px 12px; border: 1px solid #e9a79d; color: #c0392b; background: #fff; border-radius: 12px; }
+.historyItem { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 13.5px; border-bottom: 1px solid #f0f2f5; }
+.historyItem:last-child { border-bottom: none; }
+.historyItem:hover { background: #f7f9fc; }
+.hNo { color: #c77700; font-weight: bold; min-width: 32px; }
+.hMain { flex: 1; color: #555; }
+.hMain b { color: #1a3c6e; }
+.hTime { color: #999; font-size: 12px; white-space: nowrap; }
 
 /* 答题页 */
 .topbar { position: sticky; top: 0; z-index: 10; background: #1a3c6e; color: #fff; border-radius: 0 0 10px 10px; padding: 10px 14px; }
@@ -112,12 +123,14 @@ button { cursor: pointer; font-family: inherit; }
       · 每题作答后<b>立即判定对错并锁定</b>（多选需点「确认答案」），中途不可修改<br>
       · 多选漏选、多选、错选均不得分；多选题选项顺序已全部打乱<br>
       · 中途退出自动保存进度，重新打开可继续作答<br>
-      · 交卷后生成<b>总分与答题秒数</b>，可逐题查看解析
+      · 交卷后生成<b>总分与答题秒数</b>，可逐题查看解析、一键重新答题<br>
+      · 每次交卷自动存入<b>历史答题记录</b>，可回看每次的得分、用时与解析
     </div>
     <input id="nameInput" placeholder="请输入姓名 / 学号" maxlength="20">
     <button id="fullBtn" class="modebtn">完整训练（500 题）</button>
     <button id="mockBtn" class="modebtn mock">随机模拟卷（100 题）</button>
     <button id="resumeMockBtn" class="modebtn resume hidden">继续上次未完成的模拟卷</button>
+    <div id="historyBox" class="history hidden"></div>
   </div>
 </div>
 
@@ -142,8 +155,8 @@ button { cursor: pointer; font-family: inherit; }
   <div class="resultcard" id="resultBox"></div>
   <div class="filters" id="filters"></div>
   <div id="review"></div>
-  <button id="newMockBtn" class="hidden">再抽一套模拟卷</button>
-  <button id="redoBtn">重新作答</button>
+  <button id="redoExamBtn">重新答题</button>
+  <button id="redoBtn">返回首页</button>
 </div>
 
 <script src="data.js"></script>
