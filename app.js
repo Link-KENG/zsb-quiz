@@ -15,7 +15,12 @@
   var KEY_FULL = 'zsb500_full_v2';
   var KEY_MOCK = 'zsb500_mock_v2';
 
-  function decode(ans64) { return atob(ans64); }
+  function decode(ans64) {
+    var bin = atob(ans64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
   function correctOf(q) { return decode(q.ans64); }
 
   var state = null; // { name, mode, paper:[flatIdx...], answers, locked, startAt, submitted, idx }
