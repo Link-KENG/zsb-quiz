@@ -264,10 +264,13 @@
         html += '<div class="' + cls + '" data-lt="' + op[0] + '">' +
           '<span class="lt">' + op[0] + '</span><span>' + op[1] + '</span></div>';
       });
-      if (q.t === 'multi' && !lk) {
-        var nSel = Array.isArray(u) ? u.length : 0;
-        html += '<button class="confirmbtn" data-confirm="1"' + (nSel === 0 ? ' disabled' : '') + '>确认答案（已选 ' + nSel + ' 项）</button>';
-      }
+    }
+    if (!lk) {
+      var canConfirm = q.t === 'multi' ? (Array.isArray(u) && u.length > 0) : (u != null);
+      var confirmLabel = q.t === 'multi'
+        ? '确认答案（已选 ' + (Array.isArray(u) ? u.length : 0) + ' 项）'
+        : '确认答案';
+      html += '<button class="confirmbtn" data-confirm="1"' + (canConfirm ? '' : ' disabled') + '>' + confirmLabel + '</button>';
     }
     $('qcard').innerHTML = html;
     if (!lk) {
@@ -278,7 +281,7 @@
         el.onclick = function () { choose(pos, el.dataset.lt, false); };
       });
       var cb = $('qcard').querySelector('.confirmbtn');
-      if (cb) cb.onclick = function () { confirmMulti(pos); };
+      if (cb) cb.onclick = function () { confirmAnswer(pos); };
     }
   }
 
@@ -301,18 +304,17 @@
       if (i >= 0) arr.splice(i, 1); else arr.push(val);
       state.answers[pos] = arr;
     } else {
-      state.answers[pos] = val;
-      state.locked[pos] = true;
+      state.answers[pos] = val; // 仅选中，点「确认答案」后才锁定判定
     }
     save();
     renderCard();
     renderGrid();
   }
 
-  function confirmMulti(pos) {
+  function confirmAnswer(pos) {
     if (state.locked[pos]) return;
     var u = state.answers[pos];
-    if (!Array.isArray(u) || u.length === 0) return;
+    if (u == null || (Array.isArray(u) && u.length === 0)) return;
     state.locked[pos] = true;
     save();
     renderCard();
