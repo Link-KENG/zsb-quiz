@@ -27,8 +27,12 @@ button { cursor: pointer; font-family: inherit; }
 .modebtn.mock { background: #c77700; }
 .modebtn.mock:hover { background: #a86600; }
 .modebtn.resume { background: #fff; color: #1a3c6e; border: 1.5px dashed #1a3c6e; }
-#redoExamBtn { display: block; margin: 16px auto 6px; padding: 12px 40px; background: #c77700; color: #fff; border: none; border-radius: 8px; font-size: 16px; }
+.resultbtns { display: flex; gap: 12px; justify-content: center; margin: 14px 0; }
+#redoExamBtn { padding: 12px 40px; background: #c77700; color: #fff; border: none; border-radius: 8px; font-size: 16px; }
 #redoExamBtn:hover { background: #a86600; }
+#redoBtn { padding: 12px 40px; background: #1a3c6e; color: #fff; border: none; border-radius: 8px; font-size: 16px; }
+#redoBtn:hover { background: #244d8f; }
+#toggleReviewBtn { background: #eef4fc; color: #1a3c6e; border-color: #9db4d8; }
 .history { margin-top: 16px; background: #fff; border-radius: 12px; padding: 14px 16px; text-align: left; }
 .historyTitle { font-size: 15px; font-weight: bold; color: #1a3c6e; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .historyTitle button { font-size: 12px; padding: 4px 12px; border: 1px solid #e9a79d; color: #c0392b; background: #fff; border-radius: 12px; }
@@ -103,7 +107,7 @@ button { cursor: pointer; font-family: inherit; }
 .revopt.ok { background: #e8f8ef; border-color: #8fc99d; }
 .revopt.bad { background: #fde4e0; border-color: #e9a79d; }
 .revans { font-size: 13px; color: #888; margin-top: 8px; }
-#redoBtn { display: block; margin: 20px auto; padding: 12px 40px; background: #1a3c6e; color: #fff; border: none; border-radius: 8px; font-size: 16px; }
+#redoBtn { background: #1a3c6e; color: #fff; border: none; border-radius: 8px; }
 @media (max-width: 600px) {
   .bigscore { font-size: 40px; }
   .stem { font-size: 15px; }
@@ -153,10 +157,12 @@ button { cursor: pointer; font-family: inherit; }
 
 <div id="result" class="screen hidden">
   <div class="resultcard" id="resultBox"></div>
+  <div class="resultbtns">
+    <button id="redoExamBtn">重新答题</button>
+    <button id="redoBtn">返回首页</button>
+  </div>
   <div class="filters" id="filters"></div>
   <div id="review"></div>
-  <button id="redoExamBtn">重新答题</button>
-  <button id="redoBtn">返回首页</button>
 </div>
 
 <script src="data.js"></script>

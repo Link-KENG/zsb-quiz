@@ -358,6 +358,7 @@
 
   /* ---------- 结果页 ---------- */
   var reviewFilter = 'wrong'; // all | wrong
+  var reviewOpen = false;
 
   function showResult() {
     $('start').classList.add('hidden');
@@ -388,13 +389,24 @@
       '<div class="statrow">' + extra + '</div>';
     $('filters').innerHTML =
       '<button data-f="wrong" class="' + (reviewFilter === 'wrong' ? 'active' : '') + '">只看错题 / 未答</button>' +
-      '<button data-f="all" class="' + (reviewFilter === 'all' ? 'active' : '') + '">全部题目</button>';
-    $('filters').querySelectorAll('button').forEach(function (btn) {
-      btn.onclick = function () { reviewFilter = btn.dataset.f; renderReview(); };
+      '<button data-f="all" class="' + (reviewFilter === 'all' ? 'active' : '') + '">全部题目</button>' +
+      '<button id="toggleReviewBtn">' + (reviewOpen ? '收起解析' : '展开解析') + '</button>';
+    $('filters').querySelectorAll('button[data-f]').forEach(function (btn) {
+      btn.onclick = function () {
+        reviewFilter = btn.dataset.f;
+        reviewOpen = true;
+        $('toggleReviewBtn').textContent = '收起解析';
+        renderReview();
+      };
     });
+    $('toggleReviewBtn').onclick = function () {
+      reviewOpen = !reviewOpen;
+      this.textContent = reviewOpen ? '收起解析' : '展开解析';
+      if (reviewOpen) renderReview(); else $('review').innerHTML = '';
+    };
     $('redoExamBtn').classList.toggle('hidden', state.historyView);
     $('redoBtn').textContent = '返回首页';
-    renderReview();
+    if (reviewOpen) renderReview(); else $('review').innerHTML = '';
   }
 
   function renderReview() {
