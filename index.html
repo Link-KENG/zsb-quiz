@@ -22,6 +22,12 @@ button { cursor: pointer; font-family: inherit; }
 #nameInput:focus { border-color: #1a3c6e; }
 #startBtn { width: 100%; padding: 13px; font-size: 17px; background: #1a3c6e; color: #fff; border: none; border-radius: 8px; }
 #startBtn:hover { background: #244d8f; }
+.modebtn { width: 100%; padding: 13px; font-size: 16px; background: #1a3c6e; color: #fff; border: none; border-radius: 8px; margin-bottom: 10px; }
+.modebtn:hover { background: #244d8f; }
+.modebtn.mock { background: #c77700; }
+.modebtn.mock:hover { background: #a86600; }
+.modebtn.resume { background: #fff; color: #1a3c6e; border: 1.5px dashed #1a3c6e; }
+#newMockBtn { display: block; margin: 16px auto 6px; padding: 12px 40px; background: #c77700; color: #fff; border: none; border-radius: 8px; font-size: 16px; }
 
 /* 答题页 */
 .topbar { position: sticky; top: 0; z-index: 10; background: #1a3c6e; color: #fff; border-radius: 0 0 10px 10px; padding: 10px 14px; }
@@ -55,6 +61,19 @@ button { cursor: pointer; font-family: inherit; }
 .qcell.answered { background: #dff0e2; border-color: #8fc99d; color: #1e8e4d; }
 .qcell.current { background: #1a3c6e; color: #fff; border-color: #1a3c6e; }
 .qcell.wrong { background: #fde4e0; border-color: #e9a79d; color: #c0392b; }
+.feedback { padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; font-size: 15px; font-weight: bold; }
+.feedback.ok { background: #e8f8ef; color: #1e8e4d; border: 1px solid #8fc99d; }
+.feedback.bad { background: #fde4e0; color: #c0392b; border: 1px solid #e9a79d; }
+.opt.ok { border-color: #8fc99d; background: #e8f8ef; }
+.opt.bad { border-color: #e9a79d; background: #fde4e0; }
+.opt.locked { cursor: default; }
+.opt.locked:hover { border-color: #e3e6eb; background: #fff; }
+.opt.ok.locked:hover { border-color: #8fc99d; background: #e8f8ef; }
+.opt.bad.locked:hover { border-color: #e9a79d; background: #fde4e0; }
+.judgebtn.ok { border-color: #8fc99d; background: #e8f8ef; }
+.judgebtn.bad { border-color: #e9a79d; background: #fde4e0; }
+.confirmbtn { width: 100%; margin-top: 6px; padding: 11px; font-size: 15px; border-radius: 8px; border: none; background: #1a3c6e; color: #fff; }
+.confirmbtn:disabled { background: #b9c4d4; cursor: not-allowed; }
 
 /* 结果页 */
 .resultcard { background: #fff; border-radius: 16px; padding: 28px 24px; box-shadow: 0 4px 20px rgba(0,0,0,.08); margin-top: 14px; text-align: center; }
@@ -87,15 +106,18 @@ button { cursor: pointer; font-family: inherit; }
     <h1>智盛杯训练题</h1>
     <div class="sub">500 题在线答题（单选 350 + 多选 75 + 判断 75）</div>
     <div class="rules">
-      <b>考试说明</b><br>
-      · 共 5 组，每组 100 题：<b>70 道单选 + 15 道多选 + 15 道判断</b>，三题型混合穿插<br>
-      · 每题 1 分，满分 <b>500 分</b>；多选漏选、多选、错选均不得分<br>
-      · 多选题选项顺序已全部打乱，凭理解作答<br>
+      <b>两种模式任选</b><br>
+      · <b>完整训练</b>：共 5 组，每组 100 题（70 单选 + 15 多选 + 15 判断），满分 500 分<br>
+      · <b>随机模拟卷</b>：每次从 500 题中随机抽 <b>50 道单选 + 30 道多选 + 20 道判断</b>，共 100 题，满分 100 分，每次点击都是一套新卷<br>
+      · 每题作答后<b>立即判定对错并锁定</b>（多选需点「确认答案」），中途不可修改<br>
+      · 多选漏选、多选、错选均不得分；多选题选项顺序已全部打乱<br>
       · 中途退出自动保存进度，重新打开可继续作答<br>
-      · 交卷后自动判分，可逐题查看解析
+      · 交卷后生成<b>总分与答题秒数</b>，可逐题查看解析
     </div>
     <input id="nameInput" placeholder="请输入姓名 / 学号" maxlength="20">
-    <button id="startBtn">开始答题</button>
+    <button id="fullBtn" class="modebtn">完整训练（500 题）</button>
+    <button id="mockBtn" class="modebtn mock">随机模拟卷（100 题）</button>
+    <button id="resumeMockBtn" class="modebtn resume hidden">继续上次未完成的模拟卷</button>
   </div>
 </div>
 
@@ -120,6 +142,7 @@ button { cursor: pointer; font-family: inherit; }
   <div class="resultcard" id="resultBox"></div>
   <div class="filters" id="filters"></div>
   <div id="review"></div>
+  <button id="newMockBtn" class="hidden">再抽一套模拟卷</button>
   <button id="redoBtn">重新作答</button>
 </div>
 

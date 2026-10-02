@@ -1,4 +1,4 @@
-/* 智盛杯训练题 500 题在线答题 */
+/* 智盛杯训练题在线答题：完整训练500题 + 随机模拟卷100题（即答即判 + 总分/用时秒数） */
 (function () {
   'use strict';
 
@@ -9,43 +9,66 @@
       FLAT.push({ q: q, no: bi * 100 + i + 1, block: bi });
     });
   });
-  var TOTAL = FLAT.length;
+  var TOTAL_FULL = FLAT.length; // 500
   var TYPE_LABEL = { single: '单选题', multi: '多选题', judge: '判断题' };
   var TYPE_CLS = { single: 'single', multi: 'multi', judge: 'judge' };
-  var STORE_KEY = 'zsb500_v1';
+  var KEY_FULL = 'zsb500_full_v2';
+  var KEY_MOCK = 'zsb500_mock_v2';
 
   function decode(ans64) { return atob(ans64); }
   function correctOf(q) { return decode(q.ans64); }
 
-  var state = {
-    name: '',
-    answers: new Array(TOTAL).fill(null),
-    startAt: null,
-    submitted: false,
-    idx: 0
-  };
+  var state = null; // { name, mode, paper:[flatIdx...], answers, locked, startAt, submitted, idx }
 
   var $ = function (id) { return document.getElementById(id); };
   var timerInt = null;
 
+  /* ---------- 模拟卷抽题 ---------- */
+  function shuffleArr(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function genMockPaper() {
+    var singles = [], multis = [], judges = [];
+    FLAT.forEach(function (it, i) {
+      if (it.q.t === 'single') singles.push(i);
+      else if (it.q.t === 'multi') multis.push(i);
+      else judges.push(i);
+    });
+    shuffleArr(singles); shuffleArr(multis); shuffleArr(judges);
+    return shuffleArr(singles.slice(0, 50).concat(multis.slice(0, 30), judges.slice(0, 20)));
+  }
+  function newState(mode, paper) {
+    return {
+      name: '', mode: mode, paper: paper,
+      answers: new Array(paper.length).fill(null),
+      locked: new Array(paper.length).fill(false),
+      startAt: null, submitted: false, idx: 0
+    };
+  }
+
   /* ---------- 存取 ---------- */
+  function storeKey() { return state.mode === 'mock' ? KEY_MOCK : KEY_FULL; }
   function save() {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    } catch (e) {}
+    try { localStorage.setItem(storeKey(), JSON.stringify(state)); } catch (e) {}
   }
-  function load() {
+  function loadKey(key) {
     try {
-      var raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return false;
+      var raw = localStorage.getItem(key);
+      if (!raw) return null;
       var s = JSON.parse(raw);
-      if (!s.answers || s.answers.length !== TOTAL) return false;
-      state = s;
-      return true;
-    } catch (e) { return false; }
+      if (!s.paper || !s.answers || s.answers.length !== s.paper.length) return null;
+      if (!s.locked || s.locked.length !== s.paper.length) {
+        s.locked = new Array(s.paper.length).fill(false);
+      }
+      return s;
+    } catch (e) { return null; }
   }
-  function clearStore() {
-    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  function clearStores() {
+    try { localStorage.removeItem(KEY_FULL); localStorage.removeItem(KEY_MOCK); } catch (e) {}
   }
 
   /* ---------- 判分 ---------- */
@@ -63,17 +86,19 @@
     var perType = { single: { n: 0, s: 0 }, multi: { n: 0, s: 0 }, judge: { n: 0, s: 0 } };
     var perBlock = DATA.map(function () { return { n: 0, s: 0 }; });
     var right = 0, unanswered = 0;
-    FLAT.forEach(function (it) {
-      var u = state.answers[it.no - 1];
-      var ok = isCorrect(it.q, u);
-      if (u == null) unanswered++;
+    state.paper.forEach(function (fi, pos) {
+      var q = FLAT[fi].q;
+      var u = state.answers[pos];
+      var lk = state.locked[pos];
+      var ok = lk && isCorrect(q, u);
+      if (!lk) unanswered++;
       else if (ok) right++;
-      perType[it.q.t].n++;
-      if (ok) perType[it.q.t].s++;
-      perBlock[it.block].n++;
-      if (ok) perBlock[it.block].s++;
+      perType[q.t].n++;
+      if (ok) perType[q.t].s++;
+      perBlock[FLAT[fi].block].n++;
+      if (ok) perBlock[FLAT[fi].block].s++;
     });
-    return { right: right, unanswered: unanswered, perType: perType, perBlock: perBlock };
+    return { right: right, unanswered: unanswered, total: state.paper.length, perType: perType, perBlock: perBlock };
   }
 
   /* ---------- 开始页 ---------- */
@@ -81,7 +106,9 @@
     $('start').classList.remove('hidden');
     $('exam').classList.add('hidden');
     $('result').classList.add('hidden');
-    $('nameInput').value = state.name || '';
+    $('nameInput').value = state ? state.name : '';
+    var savedMock = loadKey(KEY_MOCK);
+    $('resumeMockBtn').classList.toggle('hidden', !(savedMock && !savedMock.submitted));
   }
 
   /* ---------- 答题页 ---------- */
@@ -100,11 +127,15 @@
 
   function renderTabs() {
     var html = '';
-    for (var b = 0; b < DATA.length; b++) {
-      html += '<button class="tab' + (state.block() === b ? ' active' : '') + '" data-block="' + b + '">第' + (b + 1) + '组</button>';
+    if (state.mode === 'full') {
+      for (var b = 0; b < 5; b++) {
+        html += '<button class="tab' + (blockOf() === b ? ' active' : '') + '" data-block="' + b + '">第' + (b + 1) + '组</button>';
+      }
+    } else {
+      html = '<span class="tab active">随机模拟卷</span>';
     }
     $('tabs').innerHTML = html;
-    $('tabs').querySelectorAll('.tab').forEach(function (btn) {
+    $('tabs').querySelectorAll('.tab[data-block]').forEach(function (btn) {
       btn.onclick = function () {
         state.idx = Number(btn.dataset.block) * 100;
         renderTabs(); renderInfo(); renderCard(); renderGrid(); save();
@@ -113,7 +144,7 @@
   }
 
   function renderInfo() {
-    $('counter').textContent = '第 ' + (state.idx + 1) + ' / ' + TOTAL + ' 题';
+    $('counter').textContent = '第 ' + (state.idx + 1) + ' / ' + state.paper.length + ' 题';
   }
 
   function fmtTime(ms) {
@@ -132,66 +163,110 @@
   }
 
   function renderCard() {
-    var it = FLAT[state.idx];
+    var pos = state.idx;
+    var it = FLAT[state.paper[pos]];
     var q = it.q;
-    var u = state.answers[it.no - 1];
-    var html = '<div class="qhead"><span class="qno">第 ' + it.no + ' 题</span>' +
-      '<span class="badge ' + TYPE_CLS[q.t] + '">' + TYPE_LABEL[q.t] + '</span></div>' +
-      '<div class="stem">' + q.stem + '</div>';
+    var u = state.answers[pos];
+    var lk = state.locked[pos];
+    var c = correctOf(q);
+    var html = '<div class="qhead"><span class="qno">第 ' + (pos + 1) + ' 题</span>' +
+      '<span class="badge ' + TYPE_CLS[q.t] + '">' + TYPE_LABEL[q.t] + '</span>' +
+      (state.mode === 'full' ? '<span style="color:#999;font-size:12px;">（原题库第 ' + it.no + ' 题）</span>' : '') +
+      '</div><div class="stem">' + q.stem + '</div>';
+    if (lk) {
+      html += '<div class="feedback ' + (isCorrect(q, u) ? 'ok' : 'bad') + '">' +
+        (isCorrect(q, u) ? '✓ 回答正确' : '✗ 回答错误，正确答案：' + c) + '</div>';
+    }
     if (q.t === 'judge') {
       html += '<div class="judgewrap">' +
-        judgeBtn('对', u === '对') + judgeBtn('错', u === '错') + '</div>';
+        judgeBtn('对', u === '对', lk, c) + judgeBtn('错', u === '错', lk, c) + '</div>';
     } else {
       q.opts.forEach(function (op) {
         var sel = q.t === 'multi' ? (Array.isArray(u) && u.indexOf(op[0]) >= 0) : (u === op[0]);
-        html += '<div class="opt' + (sel ? ' selected' : '') + '" data-lt="' + op[0] + '">' +
+        var cls = 'opt';
+        if (sel) cls += ' selected';
+        if (lk) {
+          cls += ' locked';
+          if (c.indexOf(op[0]) >= 0) cls += ' ok';
+          else if (sel) cls += ' bad';
+        }
+        html += '<div class="' + cls + '" data-lt="' + op[0] + '">' +
           '<span class="lt">' + op[0] + '</span><span>' + op[1] + '</span></div>';
       });
+      if (q.t === 'multi' && !lk) {
+        var nSel = Array.isArray(u) ? u.length : 0;
+        html += '<button class="confirmbtn" data-confirm="1"' + (nSel === 0 ? ' disabled' : '') + '>确认答案（已选 ' + nSel + ' 项）</button>';
+      }
     }
     $('qcard').innerHTML = html;
-    $('qcard').querySelectorAll('.opt').forEach(function (el) {
-      el.onclick = function () { choose(it.no, el.dataset.lt, q.t === 'multi'); };
-    });
-    $('qcard').querySelectorAll('.judgebtn').forEach(function (el) {
-      el.onclick = function () { choose(it.no, el.dataset.lt, false); };
-    });
+    if (!lk) {
+      $('qcard').querySelectorAll('.opt').forEach(function (el) {
+        el.onclick = function () { choose(pos, el.dataset.lt, q.t === 'multi'); };
+      });
+      $('qcard').querySelectorAll('.judgebtn').forEach(function (el) {
+        el.onclick = function () { choose(pos, el.dataset.lt, false); };
+      });
+      var cb = $('qcard').querySelector('.confirmbtn');
+      if (cb) cb.onclick = function () { confirmMulti(pos); };
+    }
   }
 
-  function judgeBtn(label, sel) {
-    return '<button class="judgebtn' + (sel ? ' selected' : '') + '" data-lt="' + label + '">' + label + '</button>';
+  function judgeBtn(label, sel, lk, c) {
+    var cls = 'judgebtn';
+    if (sel) cls += ' selected';
+    if (lk) {
+      if (c === label) cls += ' ok';
+      else if (sel) cls += ' bad';
+    }
+    return '<button class="' + cls + '" data-lt="' + label + '"' + (lk ? ' disabled' : '') + '>' + label + '</button>';
   }
 
-  function choose(no, val, isMulti) {
-    var cur = state.answers[no - 1];
+  function choose(pos, val, isMulti) {
+    if (state.locked[pos]) return;
+    var cur = state.answers[pos];
     if (isMulti) {
       var arr = Array.isArray(cur) ? cur.slice() : [];
       var i = arr.indexOf(val);
       if (i >= 0) arr.splice(i, 1); else arr.push(val);
-      state.answers[no - 1] = arr;
+      state.answers[pos] = arr;
     } else {
-      state.answers[no - 1] = val;
+      state.answers[pos] = val;
+      state.locked[pos] = true;
     }
     save();
     renderCard();
     renderGrid();
-    renderInfo();
+  }
+
+  function confirmMulti(pos) {
+    if (state.locked[pos]) return;
+    var u = state.answers[pos];
+    if (!Array.isArray(u) || u.length === 0) return;
+    state.locked[pos] = true;
+    save();
+    renderCard();
+    renderGrid();
   }
 
   function renderGrid() {
-    var b = state.block();
+    var per = state.mode === 'full' ? 100 : state.paper.length;
+    var base = state.mode === 'full' ? blockOf() * 100 : 0;
     var html = '';
-    for (var i = 0; i < 100; i++) {
-      var no = b * 100 + i + 1;
-      var u = state.answers[no - 1];
+    for (var i = 0; i < per; i++) {
+      var pos = base + i;
+      var lk = state.locked[pos];
       var cls = 'qcell';
-      if (i === state.idx % 100) cls += ' current';
-      else if (u != null) cls += ' answered';
-      html += '<div class="' + cls + '" data-idx="' + (b * 100 + i) + '">' + (i + 1) + '</div>';
+      if (lk) {
+        cls += isCorrect(FLAT[state.paper[pos]].q, state.answers[pos]) ? ' answered' : ' wrong';
+      } else if (pos === state.idx) {
+        cls += ' current';
+      }
+      html += '<div class="' + cls + '" data-pos="' + pos + '">' + (i + 1) + '</div>';
     }
     $('qgrid').innerHTML = html;
     $('qgrid').querySelectorAll('.qcell').forEach(function (el) {
       el.onclick = function () {
-        state.idx = Number(el.dataset.idx);
+        state.idx = Number(el.dataset.pos);
         renderTabs(); renderInfo(); renderCard(); renderGrid(); save();
       };
     });
@@ -199,7 +274,7 @@
 
   function submit() {
     if (state.submitted) return;
-    var unanswered = state.answers.filter(function (u) { return u == null; }).length;
+    var unanswered = state.locked.filter(function (l) { return !l; }).length;
     if (unanswered > 0 && !confirm('还有 ' + unanswered + ' 题未作答，确定交卷吗？')) return;
     state.submitted = true;
     save();
@@ -215,44 +290,55 @@
     $('exam').classList.add('hidden');
     $('result').classList.remove('hidden');
     var r = compute();
-    var time = fmtTime(state.submitted ? (Date.now() - state.startAt) : 0);
-    var pt = r.perType, pb = r.perBlock;
-    var blockRows = '';
-    for (var b = 0; b < pb.length; b++) {
-      blockRows += '<div class="stat"><b>' + pb[b].s + ' / ' + pb[b].n + '</b>第' + (b + 1) + '组</div>';
-    }
+    var ms = Date.now() - state.startAt;
+    var secs = Math.round(ms / 1000);
+    var pt = r.perType;
+    var isMock = state.mode === 'mock';
+    var extra = isMock
+      ? '<div class="stat"><b>' + pt.single.s + ' / ' + pt.single.n + '</b>单选题</div>' +
+        '<div class="stat"><b>' + pt.multi.s + ' / ' + pt.multi.n + '</b>多选题</div>' +
+        '<div class="stat"><b>' + pt.judge.s + ' / ' + pt.judge.n + '</b>判断题</div>'
+      : (function () {
+          var rows = '<div class="stat"><b>' + pt.single.s + ' / ' + pt.single.n + '</b>单选题</div>' +
+            '<div class="stat"><b>' + pt.multi.s + ' / ' + pt.multi.n + '</b>多选题</div>' +
+            '<div class="stat"><b>' + pt.judge.s + ' / ' + pt.judge.n + '</b>判断题</div>';
+          var pb = r.perBlock;
+          for (var b = 0; b < pb.length; b++) {
+            rows += '<div class="stat"><b>' + pb[b].s + ' / ' + pb[b].n + '</b>第' + (b + 1) + '组</div>';
+          }
+          return rows;
+        })();
     $('resultBox').innerHTML =
-      '<h2>' + (state.name ? state.name + ' · ' : '') + '答题成绩</h2>' +
-      '<div class="bigscore">' + r.right + '<small> / ' + TOTAL + ' 分</small></div>' +
-      '<div style="color:#888;font-size:13px;margin-top:6px;">用时 ' + time + ' · 未作答 ' + r.unanswered + ' 题</div>' +
-      '<div class="statrow">' +
-      '<div class="stat"><b>' + pt.single.s + ' / ' + pt.single.n + '</b>单选题</div>' +
-      '<div class="stat"><b>' + pt.multi.s + ' / ' + pt.multi.n + '</b>多选题</div>' +
-      '<div class="stat"><b>' + pt.judge.s + ' / ' + pt.judge.n + '</b>判断题</div>' +
-      blockRows +
-      '</div>';
+      '<h2>' + (isMock ? '随机模拟卷 · ' : '完整训练 · ') + (state.name ? state.name + ' · ' : '') + '答题成绩</h2>' +
+      '<div class="bigscore">' + r.right + '<small> / ' + r.total + ' 分</small></div>' +
+      '<div style="color:#888;font-size:14px;margin-top:8px;">答题用时：<b style="color:#1a3c6e;">' + secs + '</b> 秒（' + fmtTime(ms) + '）· 未作答 ' + r.unanswered + ' 题</div>' +
+      '<div class="statrow">' + extra + '</div>';
     $('filters').innerHTML =
       '<button data-f="wrong" class="' + (reviewFilter === 'wrong' ? 'active' : '') + '">只看错题 / 未答</button>' +
       '<button data-f="all" class="' + (reviewFilter === 'all' ? 'active' : '') + '">全部题目</button>';
     $('filters').querySelectorAll('button').forEach(function (btn) {
       btn.onclick = function () { reviewFilter = btn.dataset.f; renderReview(); };
     });
+    $('newMockBtn').classList.toggle('hidden', !isMock);
+    $('redoBtn').textContent = '返回首页';
     renderReview();
   }
 
   function renderReview() {
     var html = '';
-    FLAT.forEach(function (it) {
-      var u = state.answers[it.no - 1];
-      var ok = isCorrect(it.q, u);
+    state.paper.forEach(function (fi, pos) {
+      var q = FLAT[fi].q;
+      var u = state.answers[pos];
+      var lk = state.locked[pos];
+      var ok = lk && isCorrect(q, u);
       if (reviewFilter === 'wrong' && ok) return;
-      var q = it.q;
       var c = correctOf(q);
       html += '<div class="revcard">' +
-        '<div class="qhead"><span class="qno">第 ' + it.no + ' 题</span>' +
+        '<div class="qhead"><span class="qno">第 ' + (pos + 1) + ' 题</span>' +
         '<span class="badge ' + TYPE_CLS[q.t] + '">' + TYPE_LABEL[q.t] + '</span>' +
+        (state.mode === 'full' ? '<span style="color:#999;font-size:12px;">（原题库第 ' + (fi + 1) + ' 题）</span>' : '') +
         (ok ? '<span style="color:#1e8e4d;font-size:13px;">✓ 正确</span>' :
-          (u == null ? '<span style="color:#999;font-size:13px;">未作答</span>' : '<span style="color:#c0392b;font-size:13px;">✗ 错误</span>')) +
+          (!lk ? '<span style="color:#999;font-size:13px;">未作答</span>' : '<span style="color:#c0392b;font-size:13px;">✗ 错误</span>')) +
         '</div><div class="revstem">' + q.stem + '</div>';
       if (q.t === 'judge') {
         var myv = u == null ? '未选' : u;
@@ -276,37 +362,65 @@
   }
 
   /* ---------- 事件绑定 ---------- */
-  $('startBtn').onclick = function () {
+  function requireName() {
     var name = $('nameInput').value.trim();
-    if (!name) { alert('请先输入姓名或学号'); return; }
+    if (!name) { alert('请先输入姓名或学号'); return null; }
+    return name;
+  }
+  $('fullBtn').onclick = function () {
+    var name = requireName();
+    if (!name) return;
+    var saved = loadKey(KEY_FULL);
+    if (saved && !saved.submitted) {
+      state = saved; // 继续上次完整训练
+    } else {
+      state = newState('full', FLAT.map(function (_, i) { return i; }));
+    }
     state.name = name;
     save();
     showExam();
+  };
+  $('mockBtn').onclick = function () {
+    var name = requireName();
+    if (!name) return;
+    state = newState('mock', genMockPaper());
+    state.name = name;
+    save();
+    showExam();
+  };
+  $('resumeMockBtn').onclick = function () {
+    var saved = loadKey(KEY_MOCK);
+    if (saved && !saved.submitted) { state = saved; showExam(); }
   };
   $('prevBtn').onclick = function () {
     if (state.idx > 0) state.idx--;
     renderTabs(); renderInfo(); renderCard(); renderGrid(); save();
   };
   $('nextBtn').onclick = function () {
-    if (state.idx < TOTAL - 1) state.idx++;
+    if (state.idx < state.paper.length - 1) state.idx++;
     renderTabs(); renderInfo(); renderCard(); renderGrid(); save();
   };
   $('submitBtn').onclick = submit;
+  $('newMockBtn').onclick = function () {
+    var name = state.name;
+    state = newState('mock', genMockPaper());
+    state.name = name;
+    save();
+    showExam();
+  };
   $('redoBtn').onclick = function () {
-    clearStore();
-    state = {
-      name: '', answers: new Array(TOTAL).fill(null),
-      startAt: null, submitted: false, idx: 0
-    };
+    clearStores();
+    state = null;
     showStart();
   };
 
-  state.block = function () { return Math.floor(state.idx / 100); };
+  function blockOf() { return Math.floor(state.idx / 100); }
 
   /* ---------- 启动 ---------- */
-  if (load()) {
-    if (state.submitted) showResult();
-    else showExam();
+  var savedFull = loadKey(KEY_FULL);
+  if (savedFull) {
+    state = savedFull;
+    if (state.submitted) showResult(); else showExam();
   } else {
     showStart();
   }
